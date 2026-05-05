@@ -3,9 +3,11 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
-  dbt:
+  validate:
     runs-on: ubuntu-latest
 
     services:
@@ -24,7 +26,8 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,9 +37,50 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Setup database schema
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d finance_db -f database/ddl/01_create_schema.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d finance_db -f database/seeds/01_seed_data.sql
+
+      - name: Configure dbt profile
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << EOF
+          dbt_project:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                user: postgres
+                password: postgres
+                port: 5432
+                dbname: finance_db
+                schema: public
+                threads: 1
+          EOF
+
       - name: Run dbt
         run: |
           cd dbt_project
           dbt debug
           dbt run
           dbt test
+
+      - name: Validate Streamlit app
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'streamlit_app')
+          try:
+              import app
+              print('✅ Streamlit app imports successfully')
+          except Exception as e:
+              print(f'❌ Streamlit import failed: {e}')
+              sys.exit(1)
+          "
+        env:
+          DB_HOST: localhost
+          DB_NAME: finance_db
+          DB_USER: postgres
+          DB_PASSWORD: postgres
