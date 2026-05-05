@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: mart_rfm
+    description: "Tabela final com segmentação RFM para análise de comportamento de clientes"
+
+    columns:
+      - name: user_id
+        description: "Identificador único do usuário"
+        tests:
+          - not_null
+          - unique
+
+      - name: recency_score
+        description: "Score de recência (1-5)"
+        tests:
+          - not_null
+
+      - name: frequency_score
+        description: "Score de frequência (1-5)"
+        tests:
+          - not_null
+
+      - name: monetary_score
+        description: "Score de valor monetário (1-5)"
+        tests:
+          - not_null
+
+      - name: segment
+        description: "Segmentação do cliente baseada no score RFM"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["VIP", "Ativo", "Regular", "Risco de Churn"]
