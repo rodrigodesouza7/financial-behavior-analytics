@@ -25,5 +25,4 @@ models:
         description: "Tipo da transação (income ou expense)"
         tests:
           - accepted_values:
-              arguments:
-                values: ["income", "expense"]
+              values: ["income", "expense"]
