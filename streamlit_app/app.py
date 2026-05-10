@@ -11,6 +11,21 @@ from datetime import datetime, timedelta
 load_dotenv()
 
 # ------------------------
+# FUNÇÕES DE FORMATAÇÃO
+# ------------------------
+def format_currency(value):
+    """Formata valor monetário em padrão BR"""
+    return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def truncate_uuid(uuid_str):
+    """Trunca UUID para mostrar só primeiros 8 caracteres"""
+    return str(uuid_str)[:8] + "..."
+
+def format_date_br(date):
+    """Formata data no padrão BR"""
+    return date.strftime("%d/%m/%Y")
+
+# ------------------------
 # CONFIG PAGE
 # ------------------------
 st.set_page_config(
@@ -100,8 +115,8 @@ churn_count = len(df_filtered[df_filtered['last_transaction'] < churn_threshold]
 churn_rate = (churn_count / total_users * 100) if total_users > 0 else 0
 
 col1.metric("Clientes", f"{total_users:,}")
-col2.metric("Receita Total", f"R$ {total_revenue:,.2f}")
-col3.metric("Ticket Médio", f"R$ {avg_ticket:,.2f}")
+col2.metric("Receita Total", format_currency(total_revenue))
+col3.metric("Ticket Médio", format_currency(avg_ticket))
 col4.metric("Churn (%)", f"{churn_rate:.1f}%")
 
 st.markdown("---")
@@ -140,6 +155,11 @@ with col2:
     
     revenue_by_segment = df_filtered.groupby('segment')['monetary'].sum().reset_index()
     
+    # Formatar valores para exibição
+    revenue_by_segment['monetary_formatted'] = revenue_by_segment['monetary'].apply(
+        lambda x: f"R$ {x:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+    
     fig2 = px.bar(
         revenue_by_segment,
         x='segment',
@@ -152,9 +172,9 @@ with col2:
             'Regular': '#f39c12',
             'Risco de Churn': '#e74c3c'
         },
-        text='monetary'
+        text='monetary_formatted'
     )
-    fig2.update_traces(texttemplate='R$ %{text:,.0f}', textposition='outside')
+    fig2.update_traces(textposition='outside')
     fig2.update_layout(showlegend=False, height=400)
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -261,16 +281,26 @@ with col1:
     st.subheader("🏆 Top 10 Clientes (Receita)")
     top_customers = df_filtered.nlargest(10, 'monetary')[
         ['user_id', 'name', 'segment', 'monetary', 'frequency', 'last_transaction']
-    ]
-    top_customers['monetary'] = top_customers['monetary'].apply(lambda x: f"R$ {x:,.2f}")
+    ].copy()
+    
+    # Formatação
+    top_customers['user_id'] = top_customers['user_id'].apply(truncate_uuid)
+    top_customers['monetary'] = top_customers['monetary'].apply(format_currency)
+    top_customers['last_transaction'] = top_customers['last_transaction'].apply(format_date_br)
+    
     st.dataframe(top_customers, use_container_width=True, hide_index=True)
 
 with col2:
     st.subheader("⚠️ Risco de Churn (Prioridade)")
     churn_risk = df_filtered[df_filtered['segment'] == 'Risco de Churn'].nsmallest(10, 'last_transaction')[
         ['user_id', 'name', 'monetary', 'frequency', 'last_transaction']
-    ]
-    churn_risk['monetary'] = churn_risk['monetary'].apply(lambda x: f"R$ {x:,.2f}")
+    ].copy()
+    
+    # Formatação
+    churn_risk['user_id'] = churn_risk['user_id'].apply(truncate_uuid)
+    churn_risk['monetary'] = churn_risk['monetary'].apply(format_currency)
+    churn_risk['last_transaction'] = churn_risk['last_transaction'].apply(format_date_br)
+    
     st.dataframe(churn_risk, use_container_width=True, hide_index=True)
 
 st.markdown("---")
@@ -280,17 +310,24 @@ st.markdown("---")
 # ------------------------
 st.subheader("🎯 Análise RFM — Scatter Plot")
 
+# Criar colunas formatadas para hover
+df_scatter = df_filtered.copy()
+df_scatter['user_id_short'] = df_scatter['user_id'].apply(truncate_uuid)
+df_scatter['monetary_fmt'] = df_scatter['monetary'].apply(format_currency)
+
 fig8 = px.scatter(
-    df_filtered,
+    df_scatter,
     x='recency_score',
     y='monetary_score',
     size='frequency_score',
     color='segment',
-    hover_data=['user_id', 'name', 'monetary'],
+    hover_data=['user_id_short', 'name', 'monetary_fmt'],
     labels={
         'recency_score': 'Recency Score',
         'monetary_score': 'Monetary Score',
-        'frequency_score': 'Frequency Score'
+        'frequency_score': 'Frequency Score',
+        'user_id_short': 'User ID',
+        'monetary_fmt': 'Receita'
     },
     color_discrete_map={
         'VIP': '#2ecc71',
@@ -321,7 +358,11 @@ st.download_button(
 # TABELA COMPLETA
 # ------------------------
 with st.expander("📋 Ver Base Completa de Dados"):
-    st.dataframe(df_filtered, use_container_width=True, hide_index=True)
+    df_display = df_filtered.copy()
+    df_display['user_id'] = df_display['user_id'].apply(truncate_uuid)
+    df_display['monetary'] = df_display['monetary'].apply(format_currency)
+    df_display['last_transaction'] = df_display['last_transaction'].apply(format_date_br)
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
 
 # ------------------------
 # FOOTER
