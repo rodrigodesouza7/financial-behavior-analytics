@@ -427,6 +427,3 @@ Profissional de Tecnologia da Informação com formação em Sistemas de Informa
 
 MIT License — Projeto de portfólio profissional
 
-
-
-MIT License — Projeto de portfólio profissional
